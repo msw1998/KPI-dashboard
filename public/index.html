@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Cockpit – KPI Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <h1 id="pageTitle">Sales Cockpit – Teamview</h1>
+      <p id="pageSubtitle">Conversion Rate &amp; Time to Offer/Deal</p>
+    </div>
+    <div class="header-right">
+      <span class="date-badge" id="dateBadge">Stand: –</span>
+    </div>
+  </header>
+
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabTeamview" onclick="switchTab('teamview')">Teamview</button>
+    <button class="tab-btn" id="tabMitarbeiter" onclick="switchTab('mitarbeiter')">Mitarbeiter</button>
+  </div>
+
+  <!-- LOADING / ERROR STATE -->
+  <div id="loadingState" class="state-message">
+    <div class="spinner"></div>
+    <p>Daten werden geladen…</p>
+  </div>
+  <div id="errorState" class="state-message hidden">
+    <p class="error-text" id="errorMsg"></p>
+    <button onclick="loadData()" class="retry-btn">Erneut versuchen</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       TEAMVIEW TAB
+  ════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewTeamview" class="view hidden">
+
+    <!-- KPI CARDS -->
+    <section class="kpi-cards">
+      <div class="kpi-card border-blue">
+        <span class="kpi-label">Websessions (gesamt)</span>
+        <span class="kpi-value" id="tv-totalWS">–</span>
+        <span class="kpi-period" id="tv-wsPeriod">–</span>
+      </div>
+      <div class="kpi-card border-blue">
+        <span class="kpi-label">Angebote gestellt</span>
+        <span class="kpi-value" id="tv-totalOffers">–</span>
+        <span class="kpi-period" id="tv-offersPeriod">–</span>
+      </div>
+      <div class="kpi-card border-green">
+        <span class="kpi-label">Deals gewonnen</span>
+        <span class="kpi-value" id="tv-totalDeals">–</span>
+        <span class="kpi-period">90-Tage-View</span>
+      </div>
+      <div class="kpi-card border-blue">
+        <span class="kpi-label">Ø CR Websession→Angebot</span>
+        <span class="kpi-value" id="tv-crWS">–</span>
+        <span class="kpi-period">90-Tage-View</span>
+      </div>
+      <div class="kpi-card border-orange">
+        <span class="kpi-label">Ø CR Angebot→Auftrag</span>
+        <span class="kpi-value" id="tv-crOffer">–</span>
+        <span class="kpi-period">90-Tage-View</span>
+      </div>
+    </section>
+
+    <!-- WEBSESSION → ANGEBOT -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Websession → Angebot</h2>
+
+      <div class="chart-row">
+        <div class="chart-box">
+          <p class="chart-label">Websessions &amp; Angebote pro Monat</p>
+          <canvas id="tv-barWS"></canvas>
+        </div>
+        <div class="chart-box">
+          <p class="chart-label">Conversion Rates nach Zeitfenster</p>
+          <canvas id="tv-lineWS"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-box full-width">
+        <p class="chart-label">Ø Time to Offer (Tage)</p>
+        <canvas id="tv-hbarTTO"></canvas>
+      </div>
+    </section>
+
+    <!-- ANGEBOT → AUFTRAG -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Angebot → Auftrag</h2>
+
+      <div class="chart-row">
+        <div class="chart-box">
+          <p class="chart-label">Angebote &amp; gewonnene Deals</p>
+          <canvas id="tv-barDeals"></canvas>
+        </div>
+        <div class="chart-box">
+          <p class="chart-label">Conversion Rate Angebot → Auftrag</p>
+          <canvas id="tv-lineDeals"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-box full-width">
+        <p class="chart-label">Ø Lifecycle Time (Tage bis Deal)</p>
+        <canvas id="tv-hbarLC"></canvas>
+      </div>
+    </section>
+
+    <!-- KEY INSIGHTS -->
+    <section class="insights-section">
+      <span class="insights-badge">KEY INSIGHTS</span>
+      <ul class="insights-list" id="tv-insights"></ul>
+    </section>
+
+  </div><!-- /viewTeamview -->
+
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       MITARBEITER TAB
+  ════════════════════════════════════════════════════════════════════════ -->
+  <div id="viewMitarbeiter" class="view hidden">
+
+    <!-- AGENT SELECTOR -->
+    <div class="agent-bar">
+      <button class="agent-btn active" id="agentBtn-Lukas" onclick="selectAgent('Lukas Eisele')">Lukas Eisele</button>
+      <button class="agent-btn" id="agentBtn-Sam" onclick="selectAgent('Sam Holdenried')">Sam Holdenried</button>
+      <button class="agent-btn" id="agentBtn-Tobias" onclick="selectAgent('Tobias Hagl')">Tobias Hagl</button>
+    </div>
+
+    <!-- KPI CARDS -->
+    <section class="kpi-cards">
+      <div class="kpi-card border-blue">
+        <span class="kpi-label">Websessions (gesamt)</span>
+        <span class="kpi-value" id="ma-totalWS">–</span>
+        <span class="kpi-period" id="ma-wsPeriod">–</span>
+      </div>
+      <div class="kpi-card border-blue">
+        <span class="kpi-label">Angebote gestellt</span>
+        <span class="kpi-value" id="ma-totalOffers">–</span>
+        <span class="kpi-period" id="ma-offersPeriod">–</span>
+      </div>
+      <div class="kpi-card border-green">
+        <span class="kpi-label">Deals gewonnen</span>
+        <span class="kpi-value" id="ma-totalDeals">–</span>
+        <span class="kpi-period">90-Tage-View</span>
+      </div>
+      <div class="kpi-card border-blue">
+        <span class="kpi-label">Ø CR Websession→Angebot</span>
+        <span class="kpi-value" id="ma-crWS">–</span>
+        <span class="kpi-period">90-Tage-View</span>
+      </div>
+      <div class="kpi-card border-orange">
+        <span class="kpi-label">Ø CR Angebot→Auftrag</span>
+        <span class="kpi-value" id="ma-crOffer">–</span>
+        <span class="kpi-period">90-Tage-View</span>
+      </div>
+    </section>
+
+    <!-- WEBSESSION DISTRIBUTION -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Websession Verteilung</h2>
+      <div class="chart-row">
+        <div class="chart-box">
+          <p class="chart-label">Websessions pro Monat (Anteil Team)</p>
+          <canvas id="ma-stackedBar"></canvas>
+        </div>
+        <div class="chart-box">
+          <p class="chart-label">Anteil Websessions (%)</p>
+          <canvas id="ma-shareLine"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- WEBSESSION → ANGEBOT -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Websession → Angebot</h2>
+      <div class="chart-row">
+        <div class="chart-box">
+          <p class="chart-label">Websessions &amp; Angebote pro Monat</p>
+          <canvas id="ma-barWS"></canvas>
+        </div>
+        <div class="chart-box">
+          <p class="chart-label">Conversion Rates nach Zeitfenster</p>
+          <canvas id="ma-lineWS"></canvas>
+        </div>
+      </div>
+      <div class="chart-box full-width">
+        <p class="chart-label">Ø Time to Offer (Tage)</p>
+        <canvas id="ma-hbarTTO"></canvas>
+      </div>
+    </section>
+
+    <!-- ANGEBOT → AUFTRAG -->
+    <section class="dashboard-section">
+      <h2 class="section-title">Angebot → Auftrag</h2>
+      <div class="chart-row">
+        <div class="chart-box">
+          <p class="chart-label">Angebote &amp; gewonnene Deals</p>
+          <canvas id="ma-barDeals"></canvas>
+        </div>
+        <div class="chart-box">
+          <p class="chart-label">Conversion Rate Angebot → Auftrag</p>
+          <canvas id="ma-lineDeals"></canvas>
+        </div>
+      </div>
+      <div class="chart-box full-width">
+        <p class="chart-label">Ø Lifecycle Time (Tage bis Deal)</p>
+        <canvas id="ma-hbarLC"></canvas>
+      </div>
+    </section>
+
+    <!-- KEY INSIGHTS -->
+    <section class="insights-section">
+      <span class="insights-badge">KEY INSIGHTS</span>
+      <ul class="insights-list" id="ma-insights"></ul>
+    </section>
+
+  </div><!-- /viewMitarbeiter -->
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

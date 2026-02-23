@@ -1,0 +1,252 @@
+/* ═══════════════════════════════════════════
+   Base & Reset
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #EBF3FC;
+  color: #1a2e4a;
+  min-height: 100vh;
+}
+
+/* ═══════════════════════════════════════════
+   Header
+═══════════════════════════════════════════ */
+.header {
+  background: #0D2137;
+  color: #fff;
+  padding: 22px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: 0.01em; }
+.header p  { font-size: 0.85rem; margin-top: 4px; opacity: 0.8; }
+
+.date-badge {
+  background: #F5E642;
+  color: #0D2137;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 6px 14px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════
+   Tab bar
+═══════════════════════════════════════════ */
+.tab-bar {
+  background: #fff;
+  padding: 10px 32px;
+  border-bottom: 1px solid #dde8f5;
+  display: flex;
+  gap: 8px;
+}
+.tab-btn {
+  padding: 8px 22px;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a2e4a;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab-btn.active {
+  background: #2B7CE9;
+  border-color: #2B7CE9;
+  color: #fff;
+}
+.tab-btn:hover:not(.active) { border-color: #2B7CE9; color: #2B7CE9; }
+
+/* ═══════════════════════════════════════════
+   Agent selector (Mitarbeiter)
+═══════════════════════════════════════════ */
+.agent-bar {
+  display: flex;
+  gap: 8px;
+  padding: 14px 32px 0;
+}
+.agent-btn {
+  padding: 7px 20px;
+  border: 2px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a2e4a;
+  font-size: 0.87rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.agent-btn.active {
+  background: #0D2137;
+  border-color: #0D2137;
+  color: #fff;
+}
+.agent-btn:hover:not(.active) { border-color: #0D2137; color: #0D2137; }
+
+/* ═══════════════════════════════════════════
+   Loading / Error states
+═══════════════════════════════════════════ */
+.state-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 32px;
+  color: #5a7ba4;
+}
+.state-message p { font-size: 1rem; }
+.hidden { display: none !important; }
+
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #c9dff7;
+  border-top-color: #2B7CE9;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-text { color: #e05050; font-size: 0.95rem; max-width: 500px; text-align: center; }
+.retry-btn {
+  padding: 8px 22px; border: none; border-radius: 6px;
+  background: #2B7CE9; color: #fff; font-size: 0.9rem;
+  cursor: pointer; font-weight: 600;
+}
+.retry-btn:hover { background: #1a6cd8; }
+
+/* ═══════════════════════════════════════════
+   View / Layout
+═══════════════════════════════════════════ */
+.view { padding: 20px 32px 40px; }
+
+/* ═══════════════════════════════════════════
+   KPI Cards
+═══════════════════════════════════════════ */
+.kpi-cards {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  flex: 1 1 160px;
+  min-width: 145px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  border-left: 4px solid #ccc;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpi-card.border-blue   { border-left-color: #2B7CE9; }
+.kpi-card.border-green  { border-left-color: #22C55E; }
+.kpi-card.border-orange { border-left-color: #F59E0B; }
+
+.kpi-label  { font-size: 0.78rem; color: #5a7ba4; font-weight: 500; }
+.kpi-value  { font-size: 1.85rem; font-weight: 700; color: #0D2137; line-height: 1.1; }
+.kpi-period { font-size: 0.74rem; color: #8aaccc; }
+
+/* ═══════════════════════════════════════════
+   Dashboard sections
+═══════════════════════════════════════════ */
+.dashboard-section {
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px 24px 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+.section-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0D2137;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #2B7CE9;
+  margin-bottom: 20px;
+}
+
+/* ═══════════════════════════════════════════
+   Chart layout
+═══════════════════════════════════════════ */
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.chart-box { position: relative; }
+.chart-box.full-width { grid-column: 1 / -1; }
+.chart-label {
+  font-size: 0.8rem;
+  color: #5a7ba4;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+canvas { width: 100% !important; }
+
+/* ═══════════════════════════════════════════
+   Key Insights
+═══════════════════════════════════════════ */
+.insights-section {
+  background: #0D2137;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin-top: 4px;
+}
+.insights-badge {
+  display: inline-block;
+  background: #F5E642;
+  color: #0D2137;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.08em;
+  margin-bottom: 14px;
+}
+.insights-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.insights-list li {
+  color: #d0e4f8;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding-left: 16px;
+  position: relative;
+}
+.insights-list li::before {
+  content: '›';
+  position: absolute;
+  left: 0;
+  color: #5BB8F5;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════
+   Responsive
+═══════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .view       { padding: 16px 16px 32px; }
+  .tab-bar    { padding: 10px 16px; }
+  .agent-bar  { padding: 14px 16px 0; }
+  .chart-row  { grid-template-columns: 1fr; }
+  .kpi-cards  { gap: 10px; }
+  .kpi-card   { flex: 1 1 130px; }
+  .header     { padding: 16px 16px; }
+  .header h1  { font-size: 1.2rem; }
+}
+@media (max-width: 560px) {
+  .kpi-value { font-size: 1.5rem; }
+  .kpi-cards { flex-direction: column; }
+}
