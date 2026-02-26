@@ -155,6 +155,29 @@ function fmtPct(v)  { return v != null ? `${v.toFixed(1)}%` : '–'; }
 function fmtNum(v)  { return v != null ? Math.round(v).toString() : '–'; }
 function fmtDay(v)  { return v != null ? `${v.toFixed(1)} d` : '–'; }
 
+// ─── HubSpot helpers ──────────────────────────────────────────────────────────
+const GERMAN_MONTHS = { Jan:1, Feb:2, 'Mär':3, Apr:4, Mai:5, Jun:6, Jul:7, Aug:8, Sep:9, Okt:10, Nov:11, Dez:12 };
+function labelToYYYYMM(label) {
+  const [mon, yy] = label.trim().split(' ');
+  return `${2000 + parseInt(yy)}-${String(GERMAN_MONTHS[mon] || 1).padStart(2, '0')}`;
+}
+function fmtHubDate(val) {
+  if (!val) return '–';
+  // ISO date string "YYYY-MM-DD" (HubSpot date properties)
+  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+    const [y, m, day] = val.slice(0, 10).split('-');
+    return `${day}.${m}.${y}`;
+  }
+  // Unix ms timestamp (fallback)
+  const d = new Date(Number(val));
+  if (isNaN(d.getTime())) return '–';
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+}
+function fmtEuro(v) {
+  if (v == null || v === '') return '–';
+  return parseFloat(v).toLocaleString('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+}
+
 // ════════════════════════════════════════════════════════════════
 //  Chart helpers
 // ════════════════════════════════════════════════════════════════
@@ -188,7 +211,7 @@ const pctTooltip = {
 };
 
 // ─── Bar chart: Websessions & Angebote ───────────────────────────
-function chartBarWS(id, wsData) {
+function chartBarWS(id, wsData, onClickWS) {
   const labels = wsData.map(r => r.month);
   createChart(id, {
     type: 'bar',
@@ -216,6 +239,16 @@ function chartBarWS(id, wsData) {
         x: { grid: gridOpts },
         y: { grid: gridOpts, beginAtZero: true },
       },
+      ...(onClickWS ? {
+        onClick: (_evt, elements) => {
+          if (!elements.length || elements[0].datasetIndex !== 0) return;
+          onClickWS(wsData[elements[0].index].month);
+        },
+        onHover: (_evt, elements, chart) => {
+          const isWS = elements.length && elements[0].datasetIndex === 0;
+          chart.canvas.style.cursor = isWS ? 'pointer' : 'default';
+        },
+      } : {}),
     },
   });
 }
@@ -428,6 +461,14 @@ function chartStackedWS(id, wsDist, highlightAgent) {
         x: { stacked: true, grid: gridOpts },
         y: { stacked: true, grid: gridOpts, beginAtZero: true },
       },
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const el = elements[0];
+        openDealsModal(agents[el.datasetIndex], wsDist[el.index].month);
+      },
+      onHover: (_evt, elements, chart) => {
+        chart.canvas.style.cursor = elements.length ? 'pointer' : 'default';
+      },
     },
   });
 }
@@ -601,7 +642,7 @@ function renderMitarbeiter(agentName) {
   chartShareLine ('ma-shareLine',  appData.wsDist);
 
   // WS → Angebot charts
-  chartBarWS    ('ma-barWS',    wsToOffer);
+  chartBarWS    ('ma-barWS',    wsToOffer, month => openDealsModal(agentName, month));
   chartLineWS   ('ma-lineWS',   wsToOffer);
   chartHBarTTO  ('ma-hbarTTO',  wsToOffer);
 
@@ -624,4 +665,57 @@ function renderInsights(containerId, items) {
     return;
   }
   el.innerHTML = items.map(txt => `<li>${txt}</li>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════════
+//  HubSpot Deal Modal
+// ════════════════════════════════════════════════════════════════
+
+function closeModal() {
+  document.getElementById('dealModal').classList.add('hidden');
+}
+function handleModalOverlayClick(e) {
+  if (e.target.id === 'dealModal') closeModal();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+async function openDealsModal(agentName, monthLabel) {
+  const modal = document.getElementById('dealModal');
+  const body  = document.getElementById('modalBody');
+  document.getElementById('modalTitle').textContent    = `${agentName} – Websession Deals`;
+  document.getElementById('modalSubtitle').textContent = monthLabel;
+  body.innerHTML = '<div class="modal-loading"><div class="spinner"></div><p>Lade Deals…</p></div>';
+  modal.classList.remove('hidden');
+  try {
+    const month = labelToYYYYMM(monthLabel);
+    const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    renderDealsTable(body, data.deals, data.total);
+  } catch (e) {
+    body.innerHTML = `<div class="modal-error">Fehler: ${e.message}</div>`;
+  }
+}
+
+function renderDealsTable(container, deals, total) {
+  if (!deals.length) {
+    container.innerHTML = '<div class="modal-empty">Keine Deals für diesen Monat gefunden.</div>';
+    return;
+  }
+  container.innerHTML = `
+    <p class="modal-count">${total} Deal${total !== 1 ? 's' : ''} gefunden</p>
+    <table class="deals-table">
+      <thead><tr>
+        <th>Deal-Name</th><th>Websession</th><th>Betrag</th><th>Deal-Phase</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${deals.map(d => `<tr>
+          <td class="deal-name">${d.name}</td>
+          <td>${fmtHubDate(d.websessionDate)}</td>
+          <td class="deal-amount">${fmtEuro(d.amount)}</td>
+          <td><span class="deal-stage">${d.stage}</span></td>
+          <td>${d.permalink ? `<a href="${d.permalink}" target="_blank" rel="noopener" class="deal-link">↗</a>` : ''}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 }

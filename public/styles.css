@@ -250,3 +250,71 @@ canvas { width: 100% !important; }
   .kpi-value { font-size: 1.5rem; }
   .kpi-cards { flex-direction: column; }
 }
+
+/* ═══════════════════════════════════════════
+   Deal Modal
+═══════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(13,33,55,0.55);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-box {
+  background: #fff; border-radius: 12px;
+  width: min(760px, 100%); max-height: 82vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 18px 24px 14px; border-bottom: 1px solid #dde8f5; flex-shrink: 0;
+}
+.modal-title   { font-size: 1.05rem; font-weight: 700; color: #0D2137; }
+.modal-subtitle { font-size: 0.8rem; color: #5a7ba4; margin-top: 3px; }
+.modal-close {
+  background: none; border: none; font-size: 1.1rem;
+  color: #5a7ba4; cursor: pointer; padding: 2px 6px;
+  border-radius: 4px; line-height: 1; flex-shrink: 0;
+}
+.modal-close:hover { background: #f0f5fb; color: #0D2137; }
+.modal-body { overflow-y: auto; padding: 16px 24px 20px; flex: 1; }
+.modal-loading {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 40px 0; color: #5a7ba4;
+}
+.modal-error { color: #e05050; text-align: center; padding: 30px 0; font-size: 0.9rem; }
+.modal-empty { color: #5a7ba4; text-align: center; padding: 30px 0; font-size: 0.9rem; }
+.modal-count { font-size: 0.8rem; color: #5a7ba4; margin-bottom: 12px; }
+.deals-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.deals-table th {
+  text-align: left; padding: 8px 12px;
+  background: #f0f5fb; color: #5a7ba4;
+  font-weight: 600; font-size: 0.77rem;
+  border-bottom: 1px solid #dde8f5;
+}
+.deals-table td {
+  padding: 9px 12px; border-bottom: 1px solid #f0f5fb;
+  color: #1a2e4a; vertical-align: middle;
+}
+.deals-table tr:last-child td { border-bottom: none; }
+.deals-table tr:hover td { background: #f7fafd; }
+.deal-name   { font-weight: 500; max-width: 220px; word-break: break-word; }
+.deal-amount { font-weight: 600; color: #22C55E; white-space: nowrap; }
+.deal-stage  {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  background: #e8f0fe; color: #2B7CE9;
+  font-size: 0.75rem; font-weight: 500; white-space: nowrap;
+}
+.deal-link {
+  color: #2B7CE9; text-decoration: none; font-size: 1rem;
+  padding: 2px 4px; border-radius: 4px;
+}
+.deal-link:hover { background: #e8f0fe; }
+@media (max-width: 600px) {
+  .modal-box { max-height: 90vh; }
+  .deals-table { font-size: 0.78rem; }
+  .deals-table th, .deals-table td { padding: 7px 8px; }
+}

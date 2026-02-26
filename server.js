@@ -9,6 +9,15 @@ const PORT = process.env.PORT || 5000;
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '14aljkRRYQTD-7-I2LONY6LJELYqXNIMLkqoy6CVGPWM';
 // const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '12lqPJKW4CWAClat7migPmWRH4SgiImGfxOEdQEs0U_4';
 
+// ─── HubSpot ───────────────────────────────────────────────────────────────────
+const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
+
+const AGENT_OWNER_IDS = {
+  'Lukas Eisele':   '1098221282',
+  'Sam Holdenried': '279663182',
+  'Tobias Hagl':    '50639650',
+};
+
 app.use((req, res, next) => {
   res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
   next();
@@ -149,6 +158,7 @@ function parseWsDist(rows) {
     if (!monthLabel || !total || total === 0) continue;
     result.push({
       month: monthLabel,
+      isoDate: serialToISO(row[0]),
       lukas:   toNum(row[1]),
       sam:     toNum(row[2]),
       tobias:  toNum(row[3]),
@@ -159,6 +169,31 @@ function parseWsDist(rows) {
     });
   }
   return result;
+}
+
+// ─── HubSpot stage cache ──────────────────────────────────────────────────────
+
+let stageCache = null;
+async function getStageNames() {
+  if (stageCache) return stageCache;
+  const r = await fetch('https://api.hubapi.com/crm/v3/pipelines/deals/775171', {
+    headers: { Authorization: `Bearer ${HUBSPOT_TOKEN}` },
+  });
+  const data = await r.json();
+  stageCache = {};
+  for (const s of (data.stages || [])) stageCache[s.id] = s.label;
+  return stageCache;
+}
+
+let portalIdCache = null;
+async function getPortalId() {
+  if (portalIdCache) return portalIdCache;
+  const r = await fetch('https://api.hubapi.com/account-info/v3/details', {
+    headers: { Authorization: `Bearer ${HUBSPOT_TOKEN}` },
+  });
+  const data = await r.json();
+  portalIdCache = data.portalId;
+  return portalIdCache;
 }
 
 // ─── API endpoint ─────────────────────────────────────────────────────────────
@@ -230,6 +265,61 @@ app.get('/api/data', async (req, res) => {
     });
   } catch (err) {
     console.error('API error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── HubSpot deals endpoint ───────────────────────────────────────────────────
+
+app.get('/api/hubspot/deals', async (req, res) => {
+  if (!HUBSPOT_TOKEN) return res.status(500).json({ error: 'HUBSPOT_ACCESS_TOKEN not configured' });
+  const { agent, month } = req.query;  // month = "YYYY-MM"
+  const ownerId = AGENT_OWNER_IDS[agent];
+  if (!ownerId) return res.status(400).json({ error: `Unknown agent: ${agent}` });
+
+  const [yearStr, monStr] = month.split('-');
+  const startMs = String(Date.UTC(+yearStr, +monStr - 1, 1));
+  const endMs   = String(Date.UTC(+yearStr, +monStr, 1) - 1);
+
+  const body = {
+    filterGroups: [{ filters: [
+      { propertyName: 'datum_websession', operator: 'BETWEEN', value: startMs, highValue: endMs },
+      { propertyName: 'pipeline',         operator: 'EQ',      value: '775171' },
+      { propertyName: 'hubspot_owner_id', operator: 'EQ',      value: ownerId  },
+    ]}],
+    limit: 100,
+    properties: ['dealname','datum_websession','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id'],
+    sorts: [{ propertyName: 'datum_websession', direction: 'ASCENDING' }],
+  };
+
+  try {
+    const [hubRes, stages, portalId] = await Promise.all([
+      fetch('https://api.hubapi.com/crm/v3/objects/deals/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${HUBSPOT_TOKEN}` },
+        body: JSON.stringify(body),
+      }),
+      getStageNames(),
+      getPortalId(),
+    ]);
+    const data = await hubRes.json();
+    if (!hubRes.ok) return res.status(hubRes.status).json({ error: data.message || 'HubSpot error' });
+
+    const deals = (data.results || []).map(d => ({
+      id:              d.id,
+      name:            d.properties.dealname || '(kein Name)',
+      websessionDate:  d.properties.datum_websession,
+      amount:          d.properties.amount,
+      projectedAmount: d.properties.hs_projected_amount,
+      stage:           stages[d.properties.dealstage] || d.properties.dealstage || '–',
+      source:          d.properties.hs_analytics_source,
+      createdate:      d.properties.createdate,
+      permalink:       portalId ? `https://app.hubspot.com/contacts/${portalId}/deal/${d.id}` : null,
+    }));
+
+    res.json({ deals, total: data.total ?? deals.length });
+  } catch (err) {
+    console.error('HubSpot error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

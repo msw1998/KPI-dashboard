@@ -224,5 +224,19 @@
   </div><!-- /viewMitarbeiter -->
 
   <script src="dashboard.js"></script>
+
+  <!-- DEAL MODAL -->
+  <div id="dealModal" class="modal-overlay hidden" onclick="handleModalOverlayClick(event)">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <h3 id="modalTitle" class="modal-title">Deals</h3>
+          <p id="modalSubtitle" class="modal-subtitle"></p>
+        </div>
+        <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
+  </div>
 </body>
 </html>
