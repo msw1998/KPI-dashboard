@@ -337,7 +337,7 @@ function chartHBarTTO(id, wsData) {
 }
 
 // ─── Bar chart: Angebote & Deals ─────────────────────────────────
-function chartBarDeals(id, odData, onClickOffers) {
+function chartBarDeals(id, odData, onClickOffers, onClickWon) {
   const labels = odData.map(r => r.month);
   createChart(id, {
     type: 'bar',
@@ -350,8 +350,8 @@ function chartBarDeals(id, odData, onClickOffers) {
           backgroundColor: C.navy, borderRadius: 3,
         },
         {
-          label: 'Deals (90d)',
-          data: odData.map(r => r.deals_90d ?? r.deals_60d ?? r.deals_30d),
+          label: 'Deals (30d)',
+          data: odData.map(r => r.deals_30d),
           backgroundColor: C.green, borderRadius: 3,
         },
       ],
@@ -363,14 +363,20 @@ function chartBarDeals(id, odData, onClickOffers) {
         x: { grid: gridOpts },
         y: { grid: gridOpts, beginAtZero: true },
       },
-      ...(onClickOffers ? {
+      ...(onClickOffers || onClickWon ? {
         onClick: (_evt, elements) => {
-          if (!elements.length || elements[0].datasetIndex !== 0) return;
-          onClickOffers(odData[elements[0].index].month);
+          if (!elements.length) return;
+          const { datasetIndex, index } = elements[0];
+          if (datasetIndex === 0 && onClickOffers) onClickOffers(odData[index].month);
+          if (datasetIndex === 1 && onClickWon)    onClickWon(odData[index].month);
         },
         onHover: (_evt, elements, chart) => {
-          const isOffer = elements.length && elements[0].datasetIndex === 0;
-          chart.canvas.style.cursor = isOffer ? 'pointer' : 'default';
+          const el = elements[0];
+          const clickable = el && (
+            (el.datasetIndex === 0 && onClickOffers) ||
+            (el.datasetIndex === 1 && onClickWon)
+          );
+          chart.canvas.style.cursor = clickable ? 'pointer' : 'default';
         },
       } : {}),
     },
@@ -665,7 +671,9 @@ function renderMitarbeiter(agentName) {
   chartHBarTTO  ('ma-hbarTTO',  wsToOffer);
 
   // Angebot → Auftrag charts
-  chartBarDeals ('ma-barDeals', offerToDeal, month => openOffersModal(agentName, month));
+  chartBarDeals ('ma-barDeals', offerToDeal,
+    month => openOffersModal(agentName, month),
+    month => openWonDealsModal(agentName, month));
   chartLineDeals('ma-lineDeals',offerToDeal);
   chartHBarLC   ('ma-hbarLC',   offerToDeal);
 
@@ -710,6 +718,24 @@ async function openDealsModal(agentName, monthLabel) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     renderDealsTable(body, data.deals, data.total, { label: 'Websession', key: 'websessionDate' });
+  } catch (e) {
+    body.innerHTML = `<div class="modal-error">Fehler: ${e.message}</div>`;
+  }
+}
+
+async function openWonDealsModal(agentName, monthLabel) {
+  const modal = document.getElementById('dealModal');
+  const body  = document.getElementById('modalBody');
+  document.getElementById('modalTitle').textContent    = `${agentName} – Gewonnene Deals`;
+  document.getElementById('modalSubtitle').textContent = monthLabel;
+  body.innerHTML = '<div class="modal-loading"><div class="spinner"></div><p>Lade Deals…</p></div>';
+  modal.classList.remove('hidden');
+  try {
+    const month = labelToYYYYMM(monthLabel);
+    const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}&type=won`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    renderDealsTable(body, data.deals, data.total, { label: 'Gewonnen am', key: 'wonDate' });
   } catch (e) {
     body.innerHTML = `<div class="modal-error">Fehler: ${e.message}</div>`;
   }

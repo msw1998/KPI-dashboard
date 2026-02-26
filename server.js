@@ -272,6 +272,7 @@ app.get('/api/data', async (req, res) => {
 // ─── HubSpot deals endpoint ───────────────────────────────────────────────────
 // type=websession (default): filter by datum_websession
 // type=offers:               filter by datum_websession AND angebot_verschickt_am
+// type=won:                  filter by in_deal_phase_seit, dealstage=2660879, angebot_verschickt_am
 
 app.get('/api/hubspot/deals', async (req, res) => {
   if (!HUBSPOT_TOKEN) return res.status(500).json({ error: 'HUBSPOT_ACCESS_TOKEN not configured' });
@@ -284,23 +285,37 @@ app.get('/api/hubspot/deals', async (req, res) => {
   const endMs   = String(Date.UTC(+yearStr, +monStr, 1) - 1);
 
   const isOffers = type === 'offers';
+  const isWon    = type === 'won';
 
-  const filters = [
-    { propertyName: 'datum_websession', operator: 'BETWEEN', value: startMs, highValue: endMs },
-    { propertyName: 'pipeline',         operator: 'EQ',      value: '775171' },
-    { propertyName: 'hubspot_owner_id', operator: 'EQ',      value: ownerId  },
-  ];
-  if (isOffers) {
-    filters.push({ propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs });
+  let filters;
+  if (isWon) {
+    filters = [
+      { propertyName: 'in_deal_phase_seit',    operator: 'BETWEEN', value: startMs, highValue: endMs },
+      { propertyName: 'pipeline',              operator: 'EQ',      value: '775171' },
+      { propertyName: 'dealstage',             operator: 'EQ',      value: '2660879' },
+      { propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs },
+      { propertyName: 'hubspot_owner_id',      operator: 'EQ',      value: ownerId  },
+    ];
+  } else {
+    filters = [
+      { propertyName: 'datum_websession', operator: 'BETWEEN', value: startMs, highValue: endMs },
+      { propertyName: 'pipeline',         operator: 'EQ',      value: '775171' },
+      { propertyName: 'hubspot_owner_id', operator: 'EQ',      value: ownerId  },
+    ];
+    if (isOffers) {
+      filters.push({ propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs });
+    }
   }
 
   const body = {
     filterGroups: [{ filters }],
     limit: 100,
-    properties: isOffers
-      ? ['dealname','angebot_verschickt_am','dauer_websession_zu_angebot','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id']
-      : ['dealname','datum_websession','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id'],
-    sorts: [{ propertyName: isOffers ? 'createdate' : 'datum_websession', direction: 'ASCENDING' }],
+    properties: isWon
+      ? ['dealname','in_deal_phase_seit','ai_see_lifecycle_time','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id']
+      : isOffers
+        ? ['dealname','angebot_verschickt_am','dauer_websession_zu_angebot','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id']
+        : ['dealname','datum_websession','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id'],
+    sorts: [{ propertyName: 'createdate', direction: 'ASCENDING' }],
   };
 
   try {
@@ -321,7 +336,9 @@ app.get('/api/hubspot/deals', async (req, res) => {
       name:            d.properties.dealname || '(kein Name)',
       websessionDate:  d.properties.datum_websession,
       offerDate:       d.properties.angebot_verschickt_am,
+      wonDate:         d.properties.in_deal_phase_seit,
       durationWsOffer: d.properties.dauer_websession_zu_angebot,
+      lifecycleTime:   d.properties.ai_see_lifecycle_time,
       amount:          d.properties.amount,
       projectedAmount: d.properties.hs_projected_amount,
       stage:           stages[d.properties.dealstage] || d.properties.dealstage || '–',
