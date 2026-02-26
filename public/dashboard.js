@@ -37,7 +37,7 @@ async function loadData() {
       throw new Error(err.error || `HTTP ${res.status}`);
     }
     appData = await res.json();
-    updateDateBadge(appData.fetchedAt);
+    updateDateBadge(appData.lastUpdated);
     renderActiveView();
     showView();
   } catch (e) {
@@ -64,11 +64,12 @@ function showError(msg) {
 }
 
 function updateDateBadge(isoStr) {
+  if (!isoStr) { document.getElementById('dateBadge').textContent = 'Aktualisiert: –'; return; }
   const d = new Date(isoStr);
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yy = d.getFullYear();
-  document.getElementById('dateBadge').textContent = `Stand: ${dd}.${mm}.${yy}`;
+  document.getElementById('dateBadge').textContent = `Aktualisiert: ${dd}.${mm}.${yy}`;
 }
 
 // ─── Tab switching ────────────────────────────────────────────────

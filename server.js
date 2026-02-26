@@ -166,12 +166,14 @@ app.get('/api/data', async (req, res) => {
 
     // Fetch all ranges in parallel
     const [
+      lastUpdatedRaw,
       teamWsRaw, teamOdRaw,
       lukasWsRaw, lukasOdRaw,
       samWsRaw, samOdRaw,
       tobiasWsRaw, tobiasOdRaw,
       wsDistRaw,
     ] = await Promise.all([
+      fetchRange(sheets, 'Teamview',              'A1'),
       fetchRange(sheets, 'Teamview',              'A6:M21'),
       fetchRange(sheets, 'Teamview',              'A28:M43'),
       fetchRange(sheets, 'Lukas Eisele',          'A5:M20'),
@@ -182,6 +184,16 @@ app.get('/api/data', async (req, res) => {
       fetchRange(sheets, 'Tobias Hagl',           'A28:M43'),
       fetchRange(sheets, 'Aufteilung Websessions','A4:K16'),
     ]);
+
+    // Parse last-updated date from A1 (e.g. "Last Updated: 25-02-2026" or a date serial)
+    const rawA1 = lastUpdatedRaw?.[0]?.[0];
+    let lastUpdated = null;
+    if (typeof rawA1 === 'number') {
+      lastUpdated = serialToISO(rawA1);
+    } else if (rawA1) {
+      const m = String(rawA1).match(/(\d{2})-(\d{2})-(\d{4})/);
+      if (m) lastUpdated = `${m[3]}-${m[2]}-${m[1]}`; // → YYYY-MM-DD
+    }
 
     res.json({
       teamview: {
@@ -203,7 +215,7 @@ app.get('/api/data', async (req, res) => {
         },
       },
       wsDist: parseWsDist(wsDistRaw),
-      fetchedAt: new Date().toISOString(),
+      lastUpdated,
     });
   } catch (err) {
     console.error('API error:', err.message);
