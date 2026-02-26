@@ -173,7 +173,7 @@ app.get('/api/data', async (req, res) => {
       tobiasWsRaw, tobiasOdRaw,
       wsDistRaw,
     ] = await Promise.all([
-      fetchRange(sheets, 'Teamview',              'A1', 'FORMATTED_VALUE'),
+      fetchRange(sheets, 'Teamview',              'A2', 'FORMATTED_VALUE'),
       fetchRange(sheets, 'Teamview',              'A6:M21'),
       fetchRange(sheets, 'Teamview',              'A28:M43'),
       fetchRange(sheets, 'Lukas Eisele',          'A5:M20'),
