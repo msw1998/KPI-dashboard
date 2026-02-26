@@ -270,10 +270,12 @@ app.get('/api/data', async (req, res) => {
 });
 
 // ─── HubSpot deals endpoint ───────────────────────────────────────────────────
+// type=websession (default): filter by datum_websession
+// type=offers:               filter by datum_websession AND angebot_verschickt_am
 
 app.get('/api/hubspot/deals', async (req, res) => {
   if (!HUBSPOT_TOKEN) return res.status(500).json({ error: 'HUBSPOT_ACCESS_TOKEN not configured' });
-  const { agent, month } = req.query;  // month = "YYYY-MM"
+  const { agent, month, type } = req.query;  // month = "YYYY-MM"
   const ownerId = AGENT_OWNER_IDS[agent];
   if (!ownerId) return res.status(400).json({ error: `Unknown agent: ${agent}` });
 
@@ -281,15 +283,24 @@ app.get('/api/hubspot/deals', async (req, res) => {
   const startMs = String(Date.UTC(+yearStr, +monStr - 1, 1));
   const endMs   = String(Date.UTC(+yearStr, +monStr, 1) - 1);
 
+  const isOffers = type === 'offers';
+
+  const filters = [
+    { propertyName: 'datum_websession', operator: 'BETWEEN', value: startMs, highValue: endMs },
+    { propertyName: 'pipeline',         operator: 'EQ',      value: '775171' },
+    { propertyName: 'hubspot_owner_id', operator: 'EQ',      value: ownerId  },
+  ];
+  if (isOffers) {
+    filters.push({ propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs });
+  }
+
   const body = {
-    filterGroups: [{ filters: [
-      { propertyName: 'datum_websession', operator: 'BETWEEN', value: startMs, highValue: endMs },
-      { propertyName: 'pipeline',         operator: 'EQ',      value: '775171' },
-      { propertyName: 'hubspot_owner_id', operator: 'EQ',      value: ownerId  },
-    ]}],
+    filterGroups: [{ filters }],
     limit: 100,
-    properties: ['dealname','datum_websession','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id'],
-    sorts: [{ propertyName: 'datum_websession', direction: 'ASCENDING' }],
+    properties: isOffers
+      ? ['dealname','angebot_verschickt_am','dauer_websession_zu_angebot','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id']
+      : ['dealname','datum_websession','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id'],
+    sorts: [{ propertyName: isOffers ? 'createdate' : 'datum_websession', direction: 'ASCENDING' }],
   };
 
   try {
@@ -309,11 +320,12 @@ app.get('/api/hubspot/deals', async (req, res) => {
       id:              d.id,
       name:            d.properties.dealname || '(kein Name)',
       websessionDate:  d.properties.datum_websession,
+      offerDate:       d.properties.angebot_verschickt_am,
+      durationWsOffer: d.properties.dauer_websession_zu_angebot,
       amount:          d.properties.amount,
       projectedAmount: d.properties.hs_projected_amount,
       stage:           stages[d.properties.dealstage] || d.properties.dealstage || '–',
       source:          d.properties.hs_analytics_source,
-      createdate:      d.properties.createdate,
       permalink:       portalId ? `https://app.hubspot.com/contacts/${portalId}/deal/${d.id}` : null,
     }));
 

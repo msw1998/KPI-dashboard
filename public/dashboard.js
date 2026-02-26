@@ -211,7 +211,7 @@ const pctTooltip = {
 };
 
 // ─── Bar chart: Websessions & Angebote ───────────────────────────
-function chartBarWS(id, wsData, onClickWS) {
+function chartBarWS(id, wsData, onClickWS, onClickOffers) {
   const labels = wsData.map(r => r.month);
   createChart(id, {
     type: 'bar',
@@ -225,8 +225,8 @@ function chartBarWS(id, wsData, onClickWS) {
           borderRadius: 3,
         },
         {
-          label: 'Angebote (90d)',
-          data: wsData.map(r => r.offers_90d ?? r.offers_60d ?? r.offers_30d),
+          label: 'Angebote (30d)',
+          data: wsData.map(r => r.offers_30d),
           backgroundColor: C.skyBlue,
           borderRadius: 3,
         },
@@ -239,14 +239,20 @@ function chartBarWS(id, wsData, onClickWS) {
         x: { grid: gridOpts },
         y: { grid: gridOpts, beginAtZero: true },
       },
-      ...(onClickWS ? {
+      ...(onClickWS || onClickOffers ? {
         onClick: (_evt, elements) => {
-          if (!elements.length || elements[0].datasetIndex !== 0) return;
-          onClickWS(wsData[elements[0].index].month);
+          if (!elements.length) return;
+          const { datasetIndex, index } = elements[0];
+          if (datasetIndex === 0 && onClickWS)     onClickWS(wsData[index].month);
+          if (datasetIndex === 1 && onClickOffers) onClickOffers(wsData[index].month);
         },
         onHover: (_evt, elements, chart) => {
-          const isWS = elements.length && elements[0].datasetIndex === 0;
-          chart.canvas.style.cursor = isWS ? 'pointer' : 'default';
+          const el = elements[0];
+          const clickable = el && (
+            (el.datasetIndex === 0 && onClickWS) ||
+            (el.datasetIndex === 1 && onClickOffers)
+          );
+          chart.canvas.style.cursor = clickable ? 'pointer' : 'default';
         },
       } : {}),
     },
@@ -331,7 +337,7 @@ function chartHBarTTO(id, wsData) {
 }
 
 // ─── Bar chart: Angebote & Deals ─────────────────────────────────
-function chartBarDeals(id, odData) {
+function chartBarDeals(id, odData, onClickOffers) {
   const labels = odData.map(r => r.month);
   createChart(id, {
     type: 'bar',
@@ -357,6 +363,16 @@ function chartBarDeals(id, odData) {
         x: { grid: gridOpts },
         y: { grid: gridOpts, beginAtZero: true },
       },
+      ...(onClickOffers ? {
+        onClick: (_evt, elements) => {
+          if (!elements.length || elements[0].datasetIndex !== 0) return;
+          onClickOffers(odData[elements[0].index].month);
+        },
+        onHover: (_evt, elements, chart) => {
+          const isOffer = elements.length && elements[0].datasetIndex === 0;
+          chart.canvas.style.cursor = isOffer ? 'pointer' : 'default';
+        },
+      } : {}),
     },
   });
 }
@@ -642,12 +658,14 @@ function renderMitarbeiter(agentName) {
   chartShareLine ('ma-shareLine',  appData.wsDist);
 
   // WS → Angebot charts
-  chartBarWS    ('ma-barWS',    wsToOffer, month => openDealsModal(agentName, month));
+  chartBarWS    ('ma-barWS',    wsToOffer,
+    month => openDealsModal(agentName, month),
+    month => openOffersModal(agentName, month));
   chartLineWS   ('ma-lineWS',   wsToOffer);
   chartHBarTTO  ('ma-hbarTTO',  wsToOffer);
 
   // Angebot → Auftrag charts
-  chartBarDeals ('ma-barDeals', offerToDeal);
+  chartBarDeals ('ma-barDeals', offerToDeal, month => openOffersModal(agentName, month));
   chartLineDeals('ma-lineDeals',offerToDeal);
   chartHBarLC   ('ma-hbarLC',   offerToDeal);
 
@@ -691,27 +709,47 @@ async function openDealsModal(agentName, monthLabel) {
     const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    renderDealsTable(body, data.deals, data.total);
+    renderDealsTable(body, data.deals, data.total, { label: 'Websession', key: 'websessionDate' });
   } catch (e) {
     body.innerHTML = `<div class="modal-error">Fehler: ${e.message}</div>`;
   }
 }
 
-function renderDealsTable(container, deals, total) {
+async function openOffersModal(agentName, monthLabel) {
+  const modal = document.getElementById('dealModal');
+  const body  = document.getElementById('modalBody');
+  document.getElementById('modalTitle').textContent    = `${agentName} – Angebote versandt`;
+  document.getElementById('modalSubtitle').textContent = monthLabel;
+  body.innerHTML = '<div class="modal-loading"><div class="spinner"></div><p>Lade Angebote…</p></div>';
+  modal.classList.remove('hidden');
+  try {
+    const month = labelToYYYYMM(monthLabel);
+    const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}&type=offers`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    renderDealsTable(body, data.deals, data.total, { label: 'Angebot versandt', key: 'offerDate' });
+  } catch (e) {
+    body.innerHTML = `<div class="modal-error">Fehler: ${e.message}</div>`;
+  }
+}
+
+function renderDealsTable(container, deals, total, dateField) {
+  const dateLabel = dateField?.label ?? 'Websession';
+  const dateKey   = dateField?.key   ?? 'websessionDate';
   if (!deals.length) {
-    container.innerHTML = '<div class="modal-empty">Keine Deals für diesen Monat gefunden.</div>';
+    container.innerHTML = '<div class="modal-empty">Keine Einträge für diesen Monat gefunden.</div>';
     return;
   }
   container.innerHTML = `
     <p class="modal-count">${total} Deal${total !== 1 ? 's' : ''} gefunden</p>
     <table class="deals-table">
       <thead><tr>
-        <th>Deal-Name</th><th>Websession</th><th>Betrag</th><th>Deal-Phase</th><th></th>
+        <th>Deal-Name</th><th>${dateLabel}</th><th>Betrag</th><th>Deal-Phase</th><th></th>
       </tr></thead>
       <tbody>
         ${deals.map(d => `<tr>
           <td class="deal-name">${d.name}</td>
-          <td>${fmtHubDate(d.websessionDate)}</td>
+          <td>${fmtHubDate(d[dateKey])}</td>
           <td class="deal-amount">${fmtEuro(d.amount)}</td>
           <td><span class="deal-stage">${d.stage}</span></td>
           <td>${d.permalink ? `<a href="${d.permalink}" target="_blank" rel="noopener" class="deal-link">↗</a>` : ''}</td>
