@@ -5,10 +5,14 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '14aljkRRYQTD-7-I2LONY6LJELYqXNIMLkqoy6CVGPWM';
 // const SPREADSHEET_ID = process.env.SPREADSHEET_ID || '12lqPJKW4CWAClat7migPmWRH4SgiImGfxOEdQEs0U_4';
 
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -230,6 +234,6 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Sales Cockpit dashboard running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Sales Cockpit dashboard running at http://0.0.0.0:${PORT}`);
 });
