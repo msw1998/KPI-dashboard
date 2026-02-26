@@ -65,13 +65,13 @@ function serialToISO(serial) {
 
 // ─── Sheet fetch ──────────────────────────────────────────────────────────────
 
-async function fetchRange(sheets, sheetName, range) {
+async function fetchRange(sheets, sheetName, range, renderOption = 'UNFORMATTED_VALUE') {
   // Sheet names with spaces need single-quote wrapping in A1 notation
   const quotedName = sheetName.includes(' ') ? `'${sheetName}'` : sheetName;
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: `${quotedName}!${range}`,
-    valueRenderOption: 'UNFORMATTED_VALUE',
+    valueRenderOption: renderOption,
   });
   return res.data.values || [];
 }
@@ -173,7 +173,7 @@ app.get('/api/data', async (req, res) => {
       tobiasWsRaw, tobiasOdRaw,
       wsDistRaw,
     ] = await Promise.all([
-      fetchRange(sheets, 'Teamview',              'A1'),
+      fetchRange(sheets, 'Teamview',              'A1', 'FORMATTED_VALUE'),
       fetchRange(sheets, 'Teamview',              'A6:M21'),
       fetchRange(sheets, 'Teamview',              'A28:M43'),
       fetchRange(sheets, 'Lukas Eisele',          'A5:M20'),
@@ -185,14 +185,21 @@ app.get('/api/data', async (req, res) => {
       fetchRange(sheets, 'Aufteilung Websessions','A4:K16'),
     ]);
 
-    // Parse last-updated date from A1 (e.g. "Last Updated: 25-02-2026" or a date serial)
+    // Parse last-updated date from A1 (formatted text, e.g. "Last Updated: 25-02-2026",
+    // "25.02.2026", "25/02/2026", or ISO "2026-02-25")
     const rawA1 = lastUpdatedRaw?.[0]?.[0];
     let lastUpdated = null;
-    if (typeof rawA1 === 'number') {
-      lastUpdated = serialToISO(rawA1);
-    } else if (rawA1) {
-      const m = String(rawA1).match(/(\d{2})-(\d{2})-(\d{4})/);
-      if (m) lastUpdated = `${m[3]}-${m[2]}-${m[1]}`; // → YYYY-MM-DD
+    if (rawA1) {
+      const s = String(rawA1);
+      // Try YYYY-MM-DD (ISO) first
+      const mISO = s.match(/(\d{4})[.\-\/](\d{2})[.\-\/](\d{2})/);
+      if (mISO) {
+        lastUpdated = `${mISO[1]}-${mISO[2]}-${mISO[3]}`;
+      } else {
+        // Try DD-MM-YYYY / DD.MM.YYYY / DD/MM/YYYY
+        const mDMY = s.match(/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})/);
+        if (mDMY) lastUpdated = `${mDMY[3]}-${mDMY[2].padStart(2,'0')}-${mDMY[1].padStart(2,'0')}`;
+      }
     }
 
     res.json({
