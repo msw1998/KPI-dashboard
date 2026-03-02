@@ -483,7 +483,7 @@ function chartStackedWS(id, wsDist, highlightAgent) {
         x: { stacked: true, grid: gridOpts },
         y: { stacked: true, grid: gridOpts, beginAtZero: true },
       },
-      onClick: (evt, elements) => {
+      onClick: (_evt, elements) => {
         if (!elements.length) return;
         const el = elements[0];
         openDealsModal(agents[el.datasetIndex], wsDist[el.index].month);
@@ -627,10 +627,14 @@ function renderTeamview() {
   document.getElementById('tv-crOffer').textContent    = fmtPct(kpi.crOffer);
 
   // Charts
-  chartBarWS    ('tv-barWS',    wsToOffer);
+  chartBarWS    ('tv-barWS',    wsToOffer,
+    month => openDealsModal(null, month),
+    month => openOffersModal(null, month, 'offers-ws'));
   chartLineWS   ('tv-lineWS',   wsToOffer);
   chartHBarTTO  ('tv-hbarTTO',  wsToOffer);
-  chartBarDeals ('tv-barDeals', offerToDeal);
+  chartBarDeals ('tv-barDeals', offerToDeal,
+    month => openOffersModal(null, month),
+    month => openWonDealsModal(null, month));
   chartLineDeals('tv-lineDeals',offerToDeal);
   chartHBarLC   ('tv-hbarLC',   offerToDeal);
 
@@ -666,7 +670,7 @@ function renderMitarbeiter(agentName) {
   // WS → Angebot charts
   chartBarWS    ('ma-barWS',    wsToOffer,
     month => openDealsModal(agentName, month),
-    month => openOffersModal(agentName, month));
+    month => openOffersModal(agentName, month, 'offers-ws'));
   chartLineWS   ('ma-lineWS',   wsToOffer);
   chartHBarTTO  ('ma-hbarTTO',  wsToOffer);
 
@@ -705,16 +709,23 @@ function handleModalOverlayClick(e) {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
+function buildDealsUrl(agentName, month, type) {
+  let url = `/api/hubspot/deals?month=${month}`;
+  if (agentName) url += `&agent=${encodeURIComponent(agentName)}`;
+  if (type)      url += `&type=${type}`;
+  return url;
+}
+
 async function openDealsModal(agentName, monthLabel) {
   const modal = document.getElementById('dealModal');
   const body  = document.getElementById('modalBody');
-  document.getElementById('modalTitle').textContent    = `${agentName} – Websession Deals`;
+  document.getElementById('modalTitle').textContent    = `${agentName || 'Team'} – Websession Deals`;
   document.getElementById('modalSubtitle').textContent = monthLabel;
   body.innerHTML = '<div class="modal-loading"><div class="spinner"></div><p>Lade Deals…</p></div>';
   modal.classList.remove('hidden');
   try {
     const month = labelToYYYYMM(monthLabel);
-    const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}`);
+    const res  = await fetch(buildDealsUrl(agentName, month));
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     renderDealsTable(body, data.deals, data.total, { label: 'Websession', key: 'websessionDate' });
@@ -726,13 +737,13 @@ async function openDealsModal(agentName, monthLabel) {
 async function openWonDealsModal(agentName, monthLabel) {
   const modal = document.getElementById('dealModal');
   const body  = document.getElementById('modalBody');
-  document.getElementById('modalTitle').textContent    = `${agentName} – Gewonnene Deals`;
+  document.getElementById('modalTitle').textContent    = `${agentName || 'Team'} – Gewonnene Deals`;
   document.getElementById('modalSubtitle').textContent = monthLabel;
   body.innerHTML = '<div class="modal-loading"><div class="spinner"></div><p>Lade Deals…</p></div>';
   modal.classList.remove('hidden');
   try {
     const month = labelToYYYYMM(monthLabel);
-    const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}&type=won`);
+    const res  = await fetch(buildDealsUrl(agentName, month, 'won'));
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     renderDealsTable(body, data.deals, data.total, { label: 'Gewonnen am', key: 'wonDate' });
@@ -741,16 +752,16 @@ async function openWonDealsModal(agentName, monthLabel) {
   }
 }
 
-async function openOffersModal(agentName, monthLabel) {
+async function openOffersModal(agentName, monthLabel, type = 'offers') {
   const modal = document.getElementById('dealModal');
   const body  = document.getElementById('modalBody');
-  document.getElementById('modalTitle').textContent    = `${agentName} – Angebote versandt`;
+  document.getElementById('modalTitle').textContent    = `${agentName || 'Team'} – Angebote versandt`;
   document.getElementById('modalSubtitle').textContent = monthLabel;
   body.innerHTML = '<div class="modal-loading"><div class="spinner"></div><p>Lade Angebote…</p></div>';
   modal.classList.remove('hidden');
   try {
     const month = labelToYYYYMM(monthLabel);
-    const res  = await fetch(`/api/hubspot/deals?agent=${encodeURIComponent(agentName)}&month=${month}&type=offers`);
+    const res  = await fetch(buildDealsUrl(agentName, month, type));
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     renderDealsTable(body, data.deals, data.total, { label: 'Angebot versandt', key: 'offerDate' });

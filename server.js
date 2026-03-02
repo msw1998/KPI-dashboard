@@ -277,15 +277,16 @@ app.get('/api/data', async (req, res) => {
 app.get('/api/hubspot/deals', async (req, res) => {
   if (!HUBSPOT_TOKEN) return res.status(500).json({ error: 'HUBSPOT_ACCESS_TOKEN not configured' });
   const { agent, month, type } = req.query;  // month = "YYYY-MM"
-  const ownerId = AGENT_OWNER_IDS[agent];
-  if (!ownerId) return res.status(400).json({ error: `Unknown agent: ${agent}` });
+  const ownerId = agent ? AGENT_OWNER_IDS[agent] : null;
+  if (agent && !ownerId) return res.status(400).json({ error: `Unknown agent: ${agent}` });
 
   const [yearStr, monStr] = month.split('-');
   const startMs = String(Date.UTC(+yearStr, +monStr - 1, 1));
   const endMs   = String(Date.UTC(+yearStr, +monStr, 1) - 1);
 
-  const isOffers = type === 'offers';
-  const isWon    = type === 'won';
+  const isWon      = type === 'won';
+  const isOffersWS = type === 'offers-ws';  // WS→Angebot section: datum_websession + angebot_verschickt_am
+  const isOffers   = type === 'offers';     // Angebot→Auftrag section: angebot_verschickt_am only
 
   let filters;
   if (isWon) {
@@ -294,17 +295,26 @@ app.get('/api/hubspot/deals', async (req, res) => {
       { propertyName: 'pipeline',              operator: 'EQ',      value: '775171' },
       { propertyName: 'dealstage',             operator: 'EQ',      value: '2660879' },
       { propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs },
-      { propertyName: 'hubspot_owner_id',      operator: 'EQ',      value: ownerId  },
+    ];
+  } else if (isOffersWS) {
+    filters = [
+      { propertyName: 'datum_websession',      operator: 'BETWEEN', value: startMs, highValue: endMs },
+      { propertyName: 'pipeline',              operator: 'EQ',      value: '775171' },
+      { propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs },
+    ];
+  } else if (isOffers) {
+    filters = [
+      { propertyName: 'pipeline',              operator: 'EQ',      value: '775171' },
+      { propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs },
     ];
   } else {
     filters = [
       { propertyName: 'datum_websession', operator: 'BETWEEN', value: startMs, highValue: endMs },
       { propertyName: 'pipeline',         operator: 'EQ',      value: '775171' },
-      { propertyName: 'hubspot_owner_id', operator: 'EQ',      value: ownerId  },
     ];
-    if (isOffers) {
-      filters.push({ propertyName: 'angebot_verschickt_am', operator: 'BETWEEN', value: startMs, highValue: endMs });
-    }
+  }
+  if (ownerId) {
+    filters.push({ propertyName: 'hubspot_owner_id', operator: 'EQ', value: ownerId });
   }
 
   const body = {
@@ -312,7 +322,7 @@ app.get('/api/hubspot/deals', async (req, res) => {
     limit: 100,
     properties: isWon
       ? ['dealname','in_deal_phase_seit','ai_see_lifecycle_time','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id']
-      : isOffers
+      : (isOffers || isOffersWS)
         ? ['dealname','angebot_verschickt_am','dauer_websession_zu_angebot','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id']
         : ['dealname','datum_websession','amount','createdate','hs_analytics_source','dealstage','hs_projected_amount','hs_object_id'],
     sorts: [{ propertyName: 'createdate', direction: 'ASCENDING' }],
